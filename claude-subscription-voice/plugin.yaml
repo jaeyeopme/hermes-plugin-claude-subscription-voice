@@ -1,0 +1,7 @@
+name: claude-subscription-voice
+version: 0.1.0
+description: Speech-to-text via Claude's voice_stream (Deepgram Nova 3) using the local Claude Code login. Sends the same headers/query as Claude Code.
+author: jaeyeop
+kind: standalone
+requires_hermes: ">=0.23.0"
+platforms: [macos]
