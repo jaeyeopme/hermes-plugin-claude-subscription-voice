@@ -19,7 +19,7 @@ print("url:", url)
 pcm = open(sys.argv[1], "rb").read()
 t0 = time.time()
 try:
-    ws = connect(url, additional_headers={"Authorization": f"Bearer {tok}", "User-Agent": prof["user_agent"], **prof["headers"]},
+    ws = connect(url, additional_headers={"Authorization": f"Bearer {tok}", **({"User-Agent": prof["user_agent"]} if prof["user_agent"] else {}), **prof["headers"]},
                  open_timeout=10)
 except Exception as e:
     print("CONNECT FAILED:", type(e).__name__, getattr(getattr(e, "response", None), "status_code", ""), e); sys.exit(1)

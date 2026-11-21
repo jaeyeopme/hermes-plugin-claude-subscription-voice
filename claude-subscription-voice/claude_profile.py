@@ -1,11 +1,13 @@
-"""Read the voice_stream connect profile (query, headers, UA) from the locally installed Claude Code.
+"""Connect profile (query, headers, UA) for voice_stream, following the locally installed Claude Code.
 
-The values are parsed out of the `claude` binary's own voice connect code, so they follow
-whatever version is installed. The scan takes ~0.3 s and runs once per process.
+On load the values are parsed out of the `claude` binary's own voice connect code (~0.3 s, once per
+process). Built-in DEFAULTS are the fallback: if parsing fails the plugin keeps working with them, and a
+mismatch between parsed values and DEFAULTS is logged once as a hint that Claude Code changed.
 """
 from __future__ import annotations
 
 import functools
+import logging
 import mmap
 import os
 import re
@@ -13,7 +15,18 @@ import shutil
 import subprocess
 from typing import Any
 
+logger = logging.getLogger(__name__)
+
 URL = "wss://api.anthropic.com/api/ws/speech_to_text/voice_stream"
+
+# Values observed in Claude Code 2.1.330 (terminal entrypoint). `language` is supplied by the caller.
+DEFAULTS: dict[str, Any] = {
+    "query": {"encoding": "linear16", "sample_rate": "16000", "channels": "1", "endpointing_ms": "300",
+              "utterance_end_ms": "1000", "use_conversation_engine": "true"},
+    "headers": {"x-app": "cli"},
+    "platform": "claude_code_cli",
+    "ua_kind": "external",
+}
 
 
 def _scan(path: str) -> dict[str, Any]:
@@ -37,19 +50,36 @@ def _scan(path: str) -> dict[str, Any]:
         }
 
 
+def _version(exe: str) -> str:
+    out = subprocess.run([exe, "--version"], capture_output=True, text=True, timeout=5).stdout
+    m = re.match(r"(\d+\.\d+\.\d+)", out.strip())
+    if not m:
+        raise RuntimeError("cannot read `claude --version`")
+    return m.group(1)
+
+
 @functools.lru_cache(maxsize=1)
 def load() -> dict[str, Any]:
-    """Return {"query", "headers", "user_agent"}; headers exclude Authorization."""
+    """Return {"query", "headers", "user_agent"}; headers exclude Authorization, user_agent may be None."""
+    prof, version = dict(DEFAULTS), None
     exe = shutil.which("claude")
-    if not exe:
-        raise RuntimeError("claude CLI not found on PATH")
-    prof = _scan(os.path.realpath(exe))
-    out = subprocess.run([exe, "--version"], capture_output=True, text=True, timeout=5).stdout
-    ver = re.match(r"(\d+\.\d+\.\d+)", out.strip())
-    if not ver:
-        raise RuntimeError("cannot read `claude --version`")
+    if exe:
+        try:
+            scanned = _scan(os.path.realpath(exe))
+            if scanned != {k: DEFAULTS[k] for k in scanned}:
+                logger.warning("claude-subscription-voice: Claude Code's voice_stream profile differs from "
+                               "the built-in defaults (Claude Code changed?): %s", scanned)
+            prof = {**DEFAULTS, **scanned}
+        except Exception as exc:
+            logger.warning("claude-subscription-voice: could not parse Claude Code, using defaults: %s", exc)
+        try:
+            version = _version(exe)
+        except Exception as exc:
+            logger.warning("claude-subscription-voice: %s; User-Agent will be omitted", exc)
+    else:
+        logger.warning("claude-subscription-voice: claude CLI not found on PATH; using defaults")
     return {
         "query": prof["query"],
         "headers": {**prof["headers"], "anthropic-client-platform": prof["platform"]},
-        "user_agent": f"claude-cli/{ver.group(1)} ({prof['ua_kind']}, cli)",
+        "user_agent": f"claude-cli/{version} ({prof['ua_kind']}, cli)" if version else None,
     }

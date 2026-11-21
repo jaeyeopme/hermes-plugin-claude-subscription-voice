@@ -39,7 +39,8 @@ def _token() -> str:
 
 def _headers() -> dict[str, str]:
     prof = claude_profile.load()
-    return {"Authorization": f"Bearer {_token()}", "User-Agent": prof["user_agent"], **prof["headers"]}
+    ua = {"User-Agent": prof["user_agent"]} if prof["user_agent"] else {}
+    return {"Authorization": f"Bearer {_token()}", **ua, **prof["headers"]}
 
 
 def _lang(language: Optional[str]) -> str:
