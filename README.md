@@ -8,7 +8,7 @@ A Hermes speech-to-text (STT) plugin that uses the same endpoint as Claude Code'
 ## Layout
 
 ```
-claude-subscription-voice/   Hermes plugin (plugin.yaml, __init__.py)
+claude-subscription-voice/   Hermes plugin (plugin.yaml, __init__.py, claude_profile.py)
 scripts/probe.py             Standalone connection test against the endpoint
 fixtures/                    Korean test audio (mp3 / 16 kHz s16le pcm)
 ```
@@ -41,5 +41,7 @@ Requirements: macOS (Keychain), `ffmpeg`, a logged-in `claude` CLI, and `websock
   - Headers: `Authorization`, `User-Agent: claude-cli/<local claude --version> (external, cli)`, `x-app: cli`, `anthropic-client-platform: claude_code_cli`
 - **Messages**: `KeepAlive`, then binary PCM audio, then `CloseStream`.
   The server replies with `TranscriptText` (cumulative interim) and `TranscriptEndpoint` (final).
-- The values above were taken from `claude --debug` (`[voice_stream]` log lines) and the Claude Code binary.
-  The only value read locally at runtime is the installed version.
+- **Nothing is hard-coded.** `claude_profile.py` parses the connect parameters (query, static headers,
+  client platform, UA format) out of the installed `claude` binary and reads the version from
+  `claude --version`. This runs once when the plugin loads (~0.3 s) and is retried on first use if it failed,
+  so the plugin follows whatever Claude Code version is installed. `scripts/probe.py` uses the same loader.

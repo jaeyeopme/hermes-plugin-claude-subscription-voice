@@ -1,13 +1,12 @@
 """claude-subscription-voice: Hermes STT provider backed by Claude's voice_stream (Deepgram Nova 3).
 
 Reads the Claude Code OAuth access token from the macOS Keychain (read-only; Claude Code
-owns refresh). Sends the same headers/query as Claude Code; only the UA version is read from the local install.
+owns refresh). The connect profile (query, headers, UA) is read from the installed `claude` binary on load.
 """
 from __future__ import annotations
 
-import functools
 import json
-import re
+import logging
 import shutil
 import subprocess
 import threading
@@ -17,8 +16,11 @@ from typing import Any, Optional
 
 from agent.transcription_provider import TranscriptionProvider, TranscriptionStreamSession
 
+from . import claude_profile
+
+logger = logging.getLogger(__name__)
+
 NAME = "claude-subscription-voice"
-URL = "wss://api.anthropic.com/api/ws/speech_to_text/voice_stream"
 LANGS = {"en", "es", "fr", "ja", "de", "pt", "it", "ko", "hi", "id", "ru", "pl", "tr", "nl", "uk", "el",
          "cs", "da", "sv", "no"}
 CHUNK = 3200  # 100 ms of 16 kHz s16le mono
@@ -35,19 +37,9 @@ def _token() -> str:
     return oauth["accessToken"]
 
 
-@functools.lru_cache(maxsize=1)
-def _version() -> str:
-    """Version of the locally installed Claude Code (the only part of the headers that changes)."""
-    out = subprocess.run(["claude", "--version"], capture_output=True, text=True, timeout=5).stdout
-    m = re.match(r"(\d+\.\d+\.\d+)", out.strip())
-    if not m:
-        raise RuntimeError("cannot read `claude --version`")
-    return m.group(1)
-
-
 def _headers() -> dict[str, str]:
-    return {"Authorization": f"Bearer {_token()}", "User-Agent": f"claude-cli/{_version()} (external, cli)",
-            "x-app": "cli", "anthropic-client-platform": "claude_code_cli"}
+    prof = claude_profile.load()
+    return {"Authorization": f"Bearer {_token()}", "User-Agent": prof["user_agent"], **prof["headers"]}
 
 
 def _lang(language: Optional[str]) -> str:
@@ -60,11 +52,8 @@ class _Stream(TranscriptionStreamSession):
 
     def __init__(self, language: Optional[str]):
         from websockets.sync.client import connect
-        query = urllib.parse.urlencode(dict(
-            encoding="linear16", sample_rate=16000, channels=1, endpointing_ms=300, utterance_end_ms=1000,
-            language=_lang(language), use_conversation_engine="true"))
-        self._ws = connect(f"{URL}?{query}", open_timeout=10,
-                           additional_headers=_headers())
+        query = urllib.parse.urlencode({**claude_profile.load()["query"], "language": _lang(language)})
+        self._ws = connect(f"{claude_profile.URL}?{query}", open_timeout=10, additional_headers=_headers())
         self._lock = threading.Lock()
         self._segments: list[str] = []
         self._current = ""
@@ -173,4 +162,8 @@ class ClaudeVoiceProvider(TranscriptionProvider):
 
 
 def register(ctx) -> None:
+    try:
+        claude_profile.load()  # warm up; retried on first use if it fails
+    except Exception as exc:
+        logger.warning("claude-subscription-voice: could not read Claude Code profile yet: %s", exc)
     ctx.register_transcription_provider(ClaudeVoiceProvider())

@@ -1,16 +1,25 @@
-import json, subprocess, sys, threading, time, urllib.parse
+"""Connect once to voice_stream using the same profile as the plugin and transcribe a PCM file.
+
+usage: probe.py <file.pcm (16 kHz s16le mono)> [language]
+"""
+import importlib.util, json, pathlib, subprocess, sys, threading, time, urllib.parse
 from websockets.sync.client import connect
+
+_spec = importlib.util.spec_from_file_location(
+    "claude_profile", pathlib.Path(__file__).parent.parent / "claude-subscription-voice" / "claude_profile.py")
+claude_profile = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(claude_profile)
+prof = claude_profile.load()
 
 tok = json.loads(subprocess.run(["security", "find-generic-password", "-s", "Claude Code-credentials", "-w"],
                                 capture_output=True, text=True, check=True).stdout)["claudeAiOauth"]["accessToken"]
-q = urllib.parse.urlencode(dict(encoding="linear16", sample_rate=16000, channels=1, endpointing_ms=300,
-                                utterance_end_ms=1000, language=sys.argv[2] if len(sys.argv) > 2 else "ko",
-                                use_conversation_engine="true", stt_provider="deepgram-nova3"))
-url = "wss://api.anthropic.com/api/ws/speech_to_text/voice_stream?" + q
+q = urllib.parse.urlencode({**prof["query"], "language": sys.argv[2] if len(sys.argv) > 2 else "ko"})
+url = f"{claude_profile.URL}?{q}"
+print("url:", url)
 pcm = open(sys.argv[1], "rb").read()
 t0 = time.time()
 try:
-    ws = connect(url, additional_headers={"Authorization": f"Bearer {tok}", "User-Agent": "hermes-claude-voice/0.1"},
+    ws = connect(url, additional_headers={"Authorization": f"Bearer {tok}", "User-Agent": prof["user_agent"], **prof["headers"]},
                  open_timeout=10)
 except Exception as e:
     print("CONNECT FAILED:", type(e).__name__, getattr(getattr(e, "response", None), "status_code", ""), e); sys.exit(1)
