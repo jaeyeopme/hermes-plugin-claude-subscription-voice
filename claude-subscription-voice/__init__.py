@@ -24,6 +24,8 @@ NAME = "claude-subscription-voice"
 LANGS = {"en", "es", "fr", "ja", "de", "pt", "it", "ko", "hi", "id", "ru", "pl", "tr", "nl", "uk", "el",
          "cs", "da", "sv", "no"}
 CHUNK = 3200  # 100 ms of 16 kHz s16le mono
+FINALIZE_NO_DATA_S = 1.5  # Claude Code: give up if nothing arrives after CloseStream
+FINALIZE_SAFETY_S = 5.0   # Claude Code: hard cap on waiting for the final transcript
 
 
 def _token() -> str:
@@ -60,6 +62,9 @@ class _Stream(TranscriptionStreamSession):
         self._current = ""
         self._error = ""
         self._closed = threading.Event()
+        self._closing = False  # CloseStream sent
+        self._msgs_after_close = 0
+        self._endpoint_after_close = threading.Event()
         self._ws.send('{"type":"KeepAlive"}')
         threading.Thread(target=self._recv, daemon=True).start()
         threading.Thread(target=self._keepalive, daemon=True).start()
@@ -72,12 +77,16 @@ class _Stream(TranscriptionStreamSession):
                 msg = json.loads(raw)
                 kind = msg.get("type")
                 with self._lock:
+                    if self._closing:
+                        self._msgs_after_close += 1
                     if kind in ("TranscriptText", "TranscriptInterim"):
                         self._current = msg.get("data", "")
                     elif kind == "TranscriptEndpoint":
                         if self._current:
                             self._segments.append(self._current)
                         self._current = ""
+                        if self._closing:
+                            self._endpoint_after_close.set()
                     elif kind in ("TranscriptError", "error"):
                         self._error = str(msg.get("message") or msg.get("description") or msg)
         except Exception as exc:  # socket closed or failed
@@ -104,18 +113,29 @@ class _Stream(TranscriptionStreamSession):
     def partial_transcript(self) -> str:
         return self._text()
 
-    def finalize(self) -> dict[str, Any]:
+    def _close_quietly(self) -> None:
         try:
-            if not self._closed.is_set():
-                self._ws.send('{"type":"CloseStream"}')
-            self._closed.wait(5)
+            self._ws.close()
         except Exception:
             pass
-        finally:
-            try:
-                self._ws.close()
-            except Exception:
-                pass
+
+    def finalize(self) -> dict[str, Any]:
+        # Same rules as Claude Code: resolve on the endpoint that follows CloseStream, on 1.5 s of
+        # silence, or after 5 s; whatever interim is pending then counts as final.
+        try:
+            if not self._closed.is_set():
+                self._closing = True
+                self._ws.send('{"type":"CloseStream"}')
+                start = time.monotonic()
+                while not (self._endpoint_after_close.is_set() or self._closed.is_set()):
+                    waited = time.monotonic() - start
+                    if waited >= FINALIZE_SAFETY_S or (waited >= FINALIZE_NO_DATA_S and not self._msgs_after_close):
+                        break
+                    self._endpoint_after_close.wait(0.02)
+        except Exception:
+            pass
+        finally:  # the close handshake can take seconds; like Claude Code, don't block on it
+            threading.Thread(target=self._close_quietly, daemon=True).start()
         text = self._text()
         if text:
             return {"success": True, "transcript": text, "provider": NAME}
