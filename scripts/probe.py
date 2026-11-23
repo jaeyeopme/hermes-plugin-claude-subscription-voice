@@ -2,7 +2,7 @@
 
 usage: probe.py <file.pcm (16 kHz s16le mono)> [language]
 """
-import importlib.util, json, pathlib, subprocess, sys, threading, time, urllib.parse
+import importlib.util, json, pathlib, sys, threading, time, urllib.parse
 from websockets.sync.client import connect
 
 _spec = importlib.util.spec_from_file_location(
@@ -11,16 +11,13 @@ claude_profile = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(claude_profile)
 prof = claude_profile.load()
 
-tok = json.loads(subprocess.run(["security", "find-generic-password", "-s", "Claude Code-credentials", "-w"],
-                                capture_output=True, text=True, check=True).stdout)["claudeAiOauth"]["accessToken"]
 q = urllib.parse.urlencode({**prof["query"], "language": sys.argv[2] if len(sys.argv) > 2 else "ko"})
 url = f"{claude_profile.URL}?{q}"
 print("url:", url)
 pcm = open(sys.argv[1], "rb").read()
 t0 = time.time()
 try:
-    ws = connect(url, additional_headers={"Authorization": f"Bearer {tok}", **({"User-Agent": prof["user_agent"]} if prof["user_agent"] else {}), **prof["headers"]},
-                 open_timeout=10)
+    ws = connect(url, additional_headers=claude_profile.headers(), open_timeout=10)
 except Exception as e:
     print("CONNECT FAILED:", type(e).__name__, getattr(getattr(e, "response", None), "status_code", ""), e); sys.exit(1)
 print("connected in %.2fs" % (time.time() - t0))

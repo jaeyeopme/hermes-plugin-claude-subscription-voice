@@ -6,7 +6,6 @@ owns refresh). The connect profile (query, headers, UA) is read from the install
 from __future__ import annotations
 
 import json
-import logging
 import shutil
 import subprocess
 import threading
@@ -18,31 +17,12 @@ from agent.transcription_provider import TranscriptionProvider, TranscriptionStr
 
 from . import claude_profile
 
-logger = logging.getLogger(__name__)
-
 NAME = "claude-subscription-voice"
 LANGS = {"en", "es", "fr", "ja", "de", "pt", "it", "ko", "hi", "id", "ru", "pl", "tr", "nl", "uk", "el",
          "cs", "da", "sv", "no"}
 CHUNK = 3200  # 100 ms of 16 kHz s16le mono
 FINALIZE_NO_DATA_S = 1.5  # Claude Code: give up if nothing arrives after CloseStream
 FINALIZE_SAFETY_S = 5.0   # Claude Code: hard cap on waiting for the final transcript
-
-
-def _token() -> str:
-    out = subprocess.run(["security", "find-generic-password", "-s", "Claude Code-credentials", "-w"],
-                         capture_output=True, text=True, timeout=5)
-    if out.returncode != 0:
-        raise RuntimeError("Claude Code login not found in Keychain (run `claude auth login`)")
-    oauth = json.loads(out.stdout)["claudeAiOauth"]
-    if oauth.get("expiresAt", 0) / 1000 < time.time() + 30:
-        raise RuntimeError("Claude Code token expired — run `claude` once to refresh it")
-    return oauth["accessToken"]
-
-
-def _headers() -> dict[str, str]:
-    prof = claude_profile.load()
-    ua = {"User-Agent": prof["user_agent"]} if prof["user_agent"] else {}
-    return {"Authorization": f"Bearer {_token()}", **ua, **prof["headers"]}
 
 
 def _lang(language: Optional[str]) -> str:
@@ -56,7 +36,7 @@ class _Stream(TranscriptionStreamSession):
     def __init__(self, language: Optional[str]):
         from websockets.sync.client import connect
         query = urllib.parse.urlencode({**claude_profile.load()["query"], "language": _lang(language)})
-        self._ws = connect(f"{claude_profile.URL}?{query}", open_timeout=10, additional_headers=_headers())
+        self._ws = connect(f"{claude_profile.URL}?{query}", open_timeout=10, additional_headers=claude_profile.headers())
         self._lock = threading.Lock()
         self._segments: list[str] = []
         self._current = ""
@@ -152,7 +132,7 @@ class ClaudeVoiceProvider(TranscriptionProvider):
         return "Claude Voice (Nova 3)"
 
     def is_available(self) -> bool:
-        return bool(shutil.which("security") and shutil.which("ffmpeg"))
+        return bool(shutil.which("security"))  # ffmpeg is only needed by transcribe(), which reports its absence
 
     def list_models(self) -> list[dict[str, Any]]:
         return [{"id": "deepgram-nova3", "display": "Deepgram Nova 3"}]
@@ -183,8 +163,5 @@ class ClaudeVoiceProvider(TranscriptionProvider):
 
 
 def register(ctx) -> None:
-    try:
-        claude_profile.load()  # warm up; retried on first use if it fails
-    except Exception as exc:
-        logger.warning("claude-subscription-voice: could not read Claude Code profile yet: %s", exc)
+    claude_profile.load()  # warm up once; never raises, falls back to defaults until Hermes restarts
     ctx.register_transcription_provider(ClaudeVoiceProvider())

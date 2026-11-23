@@ -7,12 +7,14 @@ mismatch between parsed values and DEFAULTS is logged once as a hint that Claude
 from __future__ import annotations
 
 import functools
+import json
 import logging
 import mmap
 import os
 import re
 import shutil
 import subprocess
+import time
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -83,3 +85,22 @@ def load() -> dict[str, Any]:
         "headers": {**prof["headers"], "anthropic-client-platform": prof["platform"]},
         "user_agent": f"claude-cli/{version} ({prof['ua_kind']}, cli)" if version else None,
     }
+
+
+def token() -> str:
+    """Claude Code's OAuth access token from the macOS Keychain (read-only; Claude Code owns refresh)."""
+    out = subprocess.run(["security", "find-generic-password", "-s", "Claude Code-credentials", "-w"],
+                         capture_output=True, text=True, timeout=5)
+    if out.returncode != 0:
+        raise RuntimeError("Claude Code login not found in Keychain (run `claude auth login`)")
+    oauth = json.loads(out.stdout)["claudeAiOauth"]
+    if oauth.get("expiresAt", 0) / 1000 < time.time() + 30:
+        raise RuntimeError("Claude Code token expired — run `claude` once to refresh it")
+    return oauth["accessToken"]
+
+
+def headers() -> dict[str, str]:
+    """All connect headers: Authorization, User-Agent (when known) and the profile's static headers."""
+    prof = load()
+    ua = {"User-Agent": prof["user_agent"]} if prof["user_agent"] else {}
+    return {"Authorization": f"Bearer {token()}", **ua, **prof["headers"]}
