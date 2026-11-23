@@ -11,5 +11,5 @@ provides_tools: []
 provides_hooks: []
 provides_middleware: []
 license: MIT
-homepage: https://github.com/jaeyeopme/hermes-claude-voice
+homepage: https://github.com/jaeyeopme/hermes-plugin-claude-subscription-voice
 tags: [stt, voice, speech, claude]

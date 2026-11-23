@@ -1,4 +1,4 @@
-# hermes-claude-voice
+# hermes-plugin-claude-subscription-voice
 
 A [Hermes](https://github.com/NousResearch/hermes-agent) speech-to-text (STT) plugin that uses the same endpoint as
 Claude Code's `/voice` (Anthropic `voice_stream`, Deepgram Nova 3), authenticated with your local Claude Code login.
@@ -23,7 +23,7 @@ No extra API key: if `claude` works on your Mac, so does this.
 ## Install
 
 ```sh
-hermes plugins install jaeyeopme/hermes-claude-voice --enable
+hermes plugins install jaeyeopme/hermes-plugin-claude-subscription-voice --enable
 ```
 
 Or from a clone, for development:
