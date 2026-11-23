@@ -1,7 +1,11 @@
 name: claude-subscription-voice
 version: 0.1.0
 description: Speech-to-text via Claude's voice_stream (Deepgram Nova 3) using the local Claude Code login. Sends the same headers/query as Claude Code.
-author: jaeyeop
+author: jaeyeopme
 kind: standalone
 requires_hermes: ">=0.23.0"
 platforms: [macos]
+python_dependencies: ["websockets>=13.0"]
+license: MIT
+homepage: https://github.com/jaeyeopme/hermes-claude-voice
+tags: [stt, voice, speech, claude]
