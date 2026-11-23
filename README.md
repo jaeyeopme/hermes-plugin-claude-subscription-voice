@@ -1,11 +1,14 @@
 # hermes-plugin-claude-subscription-voice
 
+[![tests](https://github.com/jaeyeopme/hermes-plugin-claude-subscription-voice/actions/workflows/tests.yml/badge.svg)](https://github.com/jaeyeopme/hermes-plugin-claude-subscription-voice/actions/workflows/tests.yml)
+
 A [Hermes](https://github.com/NousResearch/hermes-agent) speech-to-text (STT) plugin that uses the same endpoint as
 Claude Code's `/voice` (Anthropic `voice_stream`, Deepgram Nova 3), authenticated with your local Claude Code login.
 No extra API key: if `claude` works on your Mac, so does this.
 
-> The endpoint is private and undocumented, and using it outside Claude Code sits in a terms-of-service gray area.
-> It can change or stop working at any time. Use at your own risk.
+> [!CAUTION]
+> This is an unofficial integration, not endorsed by Anthropic. The endpoint is private and undocumented, and using
+> it outside Claude Code sits in a terms-of-service gray area. It can change or stop working at any time.
 
 ## What it does
 
@@ -72,8 +75,6 @@ python scripts/probe.py fixtures/ko_test.pcm ko
 
 ## How it works
 
-- **Auth**: reads the OAuth access token from the Keychain item `Claude Code-credentials` (read-only).
-  Token refresh is left to Claude Code; if it has expired, run `claude` once.
 - **Endpoint**: `wss://api.anthropic.com/api/ws/speech_to_text/voice_stream`
   - Query: `encoding=linear16&sample_rate=16000&channels=1&endpointing_ms=300&utterance_end_ms=1000&language=<lang>&use_conversation_engine=true`
   - Headers: `Authorization`, `User-Agent: claude-cli/<local claude --version> (external, cli)`, `x-app: cli`, `anthropic-client-platform: claude_code_cli`
@@ -95,7 +96,7 @@ Then set `stt.provider` back to another provider.
 
 ## Development
 
-```
+```text
 plugin.yaml, __init__.py, claude_profile.py   Hermes plugin
 scripts/probe.py                            Standalone connection test against the endpoint
 fixtures/                                   Korean test audio (mp3 / 16 kHz s16le pcm)
