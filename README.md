@@ -16,7 +16,7 @@ No extra API key: if `claude` works on your Mac, so does this.
 ## Requirements
 
 - macOS (the login token is read from the Keychain)
-- Hermes `>=0.23.0`, with `websockets` in its Python environment
+- Hermes `>=0.22.4`, installed with the official installer
 - Claude Code installed and logged in (`claude` on `PATH`)
 - `ffmpeg`, for file transcription only
 
