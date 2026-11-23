@@ -5,7 +5,7 @@ import sys
 import types
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-PKG = ROOT / "claude-subscription-voice"
+PKG = ROOT
 
 _atp = types.ModuleType("agent.transcription_provider")
 _atp.TranscriptionProvider = type("TranscriptionProvider", (), {})

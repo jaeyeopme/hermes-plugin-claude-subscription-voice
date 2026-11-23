@@ -23,13 +23,13 @@ No extra API key: if `claude` works on your Mac, so does this.
 ## Install
 
 ```sh
-hermes plugins install jaeyeopme/hermes-claude-voice/claude-subscription-voice --enable
+hermes plugins install jaeyeopme/hermes-claude-voice --enable
 ```
 
 Or from a clone, for development:
 
 ```sh
-ln -s "$PWD/claude-subscription-voice" ~/.hermes/plugins/claude-subscription-voice
+ln -s "$PWD" ~/.hermes/plugins/claude-subscription-voice
 hermes plugins enable claude-subscription-voice
 ```
 
@@ -96,10 +96,10 @@ Then set `stt.provider` back to another provider.
 ## Development
 
 ```
-claude-subscription-voice/   Hermes plugin (plugin.yaml, __init__.py, claude_profile.py)
-scripts/probe.py             Standalone connection test against the endpoint
-fixtures/                    Korean test audio (mp3 / 16 kHz s16le pcm)
-tests/                       Offline tests with fake sockets, no Hermes needed
+plugin.yaml, __init__.py, claude_profile.py   Hermes plugin
+scripts/probe.py                            Standalone connection test against the endpoint
+fixtures/                                   Korean test audio (mp3 / 16 kHz s16le pcm)
+tests/                                      Offline tests with fake sockets, no Hermes needed
 ```
 
 ```sh

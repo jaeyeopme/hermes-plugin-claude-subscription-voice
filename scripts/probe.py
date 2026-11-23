@@ -6,7 +6,7 @@ import importlib.util, json, pathlib, sys, threading, time, urllib.parse
 from websockets.sync.client import connect
 
 _spec = importlib.util.spec_from_file_location(
-    "claude_profile", pathlib.Path(__file__).parent.parent / "claude-subscription-voice" / "claude_profile.py")
+    "claude_profile", pathlib.Path(__file__).parent.parent / "claude_profile.py")
 claude_profile = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(claude_profile)
 prof = claude_profile.load()
