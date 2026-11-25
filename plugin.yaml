@@ -5,7 +5,7 @@ description: Speech-to-text via Claude's voice_stream (Deepgram Nova 3) using th
 author: jaeyeopme
 kind: standalone
 requires_hermes: ">=0.22.4"
-platforms: [macos]
+platforms: [macos, linux]
 requires_env: []
 provides_tools: []
 provides_hooks: []

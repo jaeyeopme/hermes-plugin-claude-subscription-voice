@@ -87,13 +87,32 @@ def load() -> dict[str, Any]:
     }
 
 
+CREDENTIALS_FILE = os.path.expanduser("~/.claude/.credentials.json")  # where Claude Code keeps its login off macOS
+
+
+def has_login_store() -> bool:
+    """True when this machine has a place Claude Code keeps its login (Keychain on macOS, a file elsewhere)."""
+    return bool(shutil.which("security")) or os.path.isfile(CREDENTIALS_FILE)
+
+
 def token() -> str:
-    """Claude Code's OAuth access token from the macOS Keychain (read-only; Claude Code owns refresh)."""
-    out = subprocess.run(["security", "find-generic-password", "-s", "Claude Code-credentials", "-w"],
-                         capture_output=True, text=True, timeout=5)
-    if out.returncode != 0:
-        raise RuntimeError("Claude Code login not found in Keychain (run `claude auth login`)")
-    oauth = json.loads(out.stdout)["claudeAiOauth"]
+    """Claude Code's OAuth access token (read-only; Claude Code owns refresh).
+
+    macOS: the Keychain item. Linux and others: ~/.claude/.credentials.json, same JSON shape.
+    """
+    if shutil.which("security"):
+        out = subprocess.run(["security", "find-generic-password", "-s", "Claude Code-credentials", "-w"],
+                             capture_output=True, text=True, timeout=5)
+        if out.returncode != 0:
+            raise RuntimeError("Claude Code login not found in Keychain (run `claude auth login`)")
+        raw = out.stdout
+    else:
+        try:
+            with open(CREDENTIALS_FILE, encoding="utf-8") as f:
+                raw = f.read()
+        except FileNotFoundError:
+            raise RuntimeError(f"Claude Code login not found at {CREDENTIALS_FILE} (run `claude auth login`)") from None
+    oauth = json.loads(raw)["claudeAiOauth"]
     if oauth.get("expiresAt", 0) / 1000 < time.time() + 30:
         raise RuntimeError("Claude Code token expired — run `claude` once to refresh it")
     return oauth["accessToken"]

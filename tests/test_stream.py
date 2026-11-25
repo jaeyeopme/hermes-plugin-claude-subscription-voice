@@ -3,6 +3,7 @@ import json
 import queue
 import sys
 import threading
+import time
 import types
 import unittest
 from unittest import mock
@@ -107,6 +108,19 @@ class ProviderTest(unittest.TestCase):
     def test_available_without_ffmpeg(self):
         with mock.patch.object(voice.shutil, "which", lambda name: "/usr/bin/security" if name == "security" else None):
             self.assertTrue(voice.ClaudeVoiceProvider().is_available())
+
+
+class LinuxTokenTest(unittest.TestCase):
+    def test_token_from_credentials_file_without_keychain(self):
+        import json as _json, os as _os, tempfile
+        with tempfile.TemporaryDirectory() as d:
+            path = _os.path.join(d, ".credentials.json")
+            with open(path, "w") as f:
+                _json.dump({"claudeAiOauth": {"accessToken": "filetok", "expiresAt": (time.time() + 3600) * 1000}}, f)
+            with mock.patch.object(voice.claude_profile.shutil, "which", lambda name: None), \
+                 mock.patch.object(voice.claude_profile, "CREDENTIALS_FILE", path):
+                self.assertTrue(voice.ClaudeVoiceProvider().is_available())
+                self.assertEqual(voice.claude_profile.token(), "filetok")
 
 
 class HeadersTest(unittest.TestCase):

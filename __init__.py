@@ -132,7 +132,7 @@ class ClaudeVoiceProvider(TranscriptionProvider):
         return "Claude Voice (Nova 3)"
 
     def is_available(self) -> bool:
-        return bool(shutil.which("security"))  # ffmpeg is only needed by transcribe(), which reports its absence
+        return claude_profile.has_login_store()  # ffmpeg is only needed by transcribe(), which reports its absence
 
     def list_models(self) -> list[dict[str, Any]]:
         return [{"id": "deepgram-nova3", "display": "Deepgram Nova 3"}]
