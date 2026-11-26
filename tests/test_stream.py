@@ -106,11 +106,11 @@ class StreamTest(unittest.TestCase):
 
 class ProviderTest(unittest.TestCase):
     def test_available_without_ffmpeg(self):
-        with mock.patch.object(voice.shutil, "which", lambda name: "/usr/bin/security" if name == "security" else None):
+        with mock.patch.object(voice.claude_profile.shutil, "which", lambda name: "/usr/bin/security" if name == "security" else None):
             self.assertTrue(voice.ClaudeVoiceProvider().is_available())
 
 
-class LinuxTokenTest(unittest.TestCase):
+class TokenTest(unittest.TestCase):
     def test_token_from_credentials_file_without_keychain(self):
         import json as _json, os as _os, tempfile
         with tempfile.TemporaryDirectory() as d:
@@ -121,6 +121,20 @@ class LinuxTokenTest(unittest.TestCase):
                  mock.patch.object(voice.claude_profile, "CREDENTIALS_FILE", path):
                 self.assertTrue(voice.ClaudeVoiceProvider().is_available())
                 self.assertEqual(voice.claude_profile.token(), "filetok")
+
+    def _hermes(self, resolved):
+        mod = types.ModuleType("agent.anthropic_credentials")
+        mod._resolve_claude_code_token_from_credentials = lambda: resolved
+        return mock.patch.dict(sys.modules, {"agent.anthropic_credentials": mod})
+
+    def test_inside_hermes_token_comes_from_hermes_resolver(self):
+        # Hermes' resolver refreshes an expired token; the plugin must not read or refresh on its own.
+        with self._hermes("refreshed"), mock.patch.object(voice.claude_profile, "_read_token", side_effect=AssertionError):
+            self.assertEqual(voice.claude_profile.token(), "refreshed")
+
+    def test_hermes_cannot_refresh_raises(self):
+        with self._hermes(None), self.assertRaises(RuntimeError):
+            voice.claude_profile.token()
 
 
 class HeadersTest(unittest.TestCase):

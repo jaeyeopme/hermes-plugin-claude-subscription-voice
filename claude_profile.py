@@ -96,10 +96,22 @@ def has_login_store() -> bool:
 
 
 def token() -> str:
-    """Claude Code's OAuth access token (read-only; Claude Code owns refresh).
+    """Claude Code's OAuth access token. Inside Hermes, Hermes' own resolver reads it and refreshes it when expired."""
+    try:
+        # Refresh tokens are single-use: only Hermes' resolver (shared lock, Keychain mirror) may spend one.
+        # shortcut: private Hermes helper; if it is renamed we fall back to the read-only path below.
+        from agent.anthropic_credentials import _resolve_claude_code_token_from_credentials as resolve
+    except ImportError:  # outside Hermes (scripts/probe.py) or an older Hermes
+        return _read_token()
+    tok = resolve()
+    if not tok:
+        raise RuntimeError("Claude Code login missing, or expired and Hermes could not refresh it "
+                           "(run `claude auth login`)")
+    return tok
 
-    macOS: the Keychain item. Linux and others: ~/.claude/.credentials.json, same JSON shape.
-    """
+
+def _read_token() -> str:
+    """Read-only: macOS Keychain item, else ~/.claude/.credentials.json (same JSON shape)."""
     if shutil.which("security"):
         out = subprocess.run(["security", "find-generic-password", "-s", "Claude Code-credentials", "-w"],
                              capture_output=True, text=True, timeout=5)

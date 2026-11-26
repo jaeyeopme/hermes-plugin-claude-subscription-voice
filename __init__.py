@@ -1,12 +1,10 @@
 """claude-subscription-voice: Hermes STT provider backed by Claude's voice_stream (Deepgram Nova 3).
 
-Reads the Claude Code OAuth access token from the macOS Keychain (read-only; Claude Code
-owns refresh). The connect profile (query, headers, UA) is read from the installed `claude` binary on load.
+Gets the Claude Code OAuth access token through Hermes, which refreshes it when expired. The connect profile (query, headers, UA) is read from the installed `claude` binary on load.
 """
 from __future__ import annotations
 
 import json
-import shutil
 import subprocess
 import threading
 import time

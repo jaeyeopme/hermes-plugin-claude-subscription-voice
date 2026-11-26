@@ -18,7 +18,7 @@ No extra API key: if `claude` works on your Mac, so does this.
 
 ## Requirements
 
-- macOS (the login token is read from the Keychain)
+- macOS or Linux (Hermes reads the Claude Code login from the Keychain or `~/.claude/.credentials.json`)
 - Hermes `>=0.22.4`, installed with the official installer
 - Claude Code installed and logged in (`claude` on `PATH`)
 - `ffmpeg`, for file transcription only
@@ -63,14 +63,14 @@ python scripts/probe.py fixtures/ko_test.pcm ko
 | Message | Cause and fix |
 |---|---|
 | `Claude Code login not found in Keychain` | Not logged in: run `claude auth login`. |
-| `Claude Code token expired` | The plugin never refreshes the token itself. Run `claude` once and it refreshes it. |
+| `Claude Code login missing, or expired and Hermes could not refresh it` | Hermes refreshes an expired token on its own; if that fails, run `claude auth login`. |
 | `voice_stream profile differs from the built-in defaults` | Claude Code changed its connect parameters. The parsed values are used; open an issue if transcription breaks. |
 | `claude CLI not found on PATH; using defaults` | Hermes cannot see `claude`. Defaults are used and no User-Agent is sent until Hermes restarts with `claude` on `PATH`. |
 | `no speech recognized` | No transcript arrived: check the language setting and that the audio is not silent. |
 
 ## Privacy
 
-- Reads the Claude Code OAuth token from the Keychain item `Claude Code-credentials`, read-only, and sends it only to `api.anthropic.com`.
+- Gets the Claude Code OAuth token through Hermes (Keychain item `Claude Code-credentials` or `~/.claude/.credentials.json`; Hermes refreshes it when expired) and sends it only to `api.anthropic.com`.
 - Audio goes to Anthropic's `voice_stream` endpoint, the same place Claude Code's `/voice` sends it. Nothing is stored locally.
 
 ## How it works
